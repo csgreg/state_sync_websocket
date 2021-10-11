@@ -1,7 +1,5 @@
 # Socket.io szerver
 
-A szerver egy publikus verziója elérhető itt: `http://webprogramozas.inf.elte.hu:3031`
-
 Több játékos kapcsolattartására szolgáló függvényeket definiál. A szobakezeléshez és az állapotszinkronizáláshoz adnak eszközöket. Ez utóbbit többféleképpen meg lehet tenni. Alapvetően két üzenet van, és ez is kétféleképpen használható. A `sync-state` üzenet az egész állapottér szinkronizálsára szolgál. A `sync-action` üzenet egy action továbbítására szolgál. Mindkettő meghívható úgy, hogy csak a többi játékos kapja meg a szervertől a továbbított adatot, de úgy is, hogy mindenki (azaz a küldő is) megkapja. 
 
 Erre többféle szinkronizálási stratégia építhető fel. Pl. minden action dispatch-elésekor azt egy middleware nem engedi a store-ig eljutni, hanem a `sync-action`-nel fellövi a szervernek úgy, hogy mindenki (azaz a küldő kliens is) megkapja. Az `action-sent` eseményt figyelő függvény pedig dispatcheli a store felé az actiont. Persze a dispatch-et újra elkaphatja az első middleware, ezért a kapott action-be elhelyezhetünk egy metaadatot, hogy a szerverről érkezett, és ezt a middleware-ben megadjuk, hogy ne küldje újra a szervernek.
@@ -166,16 +164,3 @@ Játékos szobát elhagyásakor meghívódó üzenet.
 Adatok: objektum
 - `roomId`: szobaazonosító
 - `socketId`: a távozó játékos socket azonosítója
-
-## Docker
-
-Dockerben való futtatáshoz:
-
-1. `.env` fájl létrehozása, benne felhasználónév és bcrypt jelszó megadása
-2. `docker build -t wsserver .`
-3. `docker run -p 3031:3031 wsserver`
-
-A `http://localhost:3031/` oldalon elérhető a Socket.io UI admin felülete.
-
-Kipróbálni:
-- Kliens: https://amritb.github.io/socketio-client-tool/
