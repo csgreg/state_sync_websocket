@@ -22,14 +22,9 @@ export const gameRoom = (io) => {
 
     socket.on("join-room", async (uuid, ack) => {
       try {
-        // nincs ilyen szoba
-        const allRooms = io.sockets.adapter.rooms;
-        if (!Array.from(allRooms.keys()).includes(uuid)) {
-          throw new Error("No such room id on the socket.io server.");
-        }
-
-        // szoba state lekérése
-        // nincs benne db-ben a uuid, meghal a db query
+        // A DB az igazság forrása: a szoba akkor is létezik, ha épp egy kliens
+        // sincs bent (pl. a host átváltott egy másik appra és lecsatlakozott).
+        // Az in-memory adapter szobát a socket.join() úgyis újra létrehozza.
         const room = await db.rooms.findOne({
           where: { uuid },
         });
@@ -42,12 +37,20 @@ export const gameRoom = (io) => {
           throw new Error("The client is already in this room.");
         }
 
-        // Tele van a szoba
-        if (allRooms.get(uuid).size >= allRooms.get(uuid).roomSize) {
+        // Tele van a szoba (a roomSize az adapter szobán él; ha az újra
+        // létrejön, MAX_ROOM_SIZE-ra esünk vissza alapértelmezésként).
+        const allRooms = io.sockets.adapter.rooms;
+        const existing = allRooms.get(uuid);
+        const roomSize = (existing && existing.roomSize) || MAX_ROOM_SIZE;
+        const currentSize = existing ? existing.size : 0;
+        if (currentSize >= roomSize) {
           throw new Error("The room is already full.");
         }
 
         socket.join(uuid);
+        // a roomSize-t újra rárakjuk az (esetleg most létrejött) adapter szobára
+        allRooms.get(uuid).roomSize = roomSize;
+
         socket.broadcast
           .to(uuid)
           .emit("player-joined", { roomId: uuid, socketId: socket.id });
