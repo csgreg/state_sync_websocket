@@ -1,1 +1,12 @@
 node_modules
+
+# local SQLite database (lives on the persistent disk in production)
+wssync.sqlite
+
+# env + process-manager logs
+.env
+forever.log
+out.log
+err.log
+
+.DS_Store

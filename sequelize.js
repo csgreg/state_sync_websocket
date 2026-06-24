@@ -2,12 +2,15 @@ import Sequelize from 'sequelize';
 
 export const db = {};
 
-const dialect = process.env.NODE_ENV === 'production' ? 'mysql' : 'sqlite';
+// Default to SQLite. On a host like Render, point SQLITE_PATH at a mounted
+// persistent disk (e.g. /var/data/wssync.sqlite) so the DB survives restarts.
+const dialect = process.env.DB_DIALECT || 'sqlite';
+const storage = process.env.SQLITE_PATH || 'wssync.sqlite';
 
 const sequelize = new Sequelize('wssync', 'wssync', 'wssync', {
   dialect,
   host: 'localhost',
-  storage: 'wssync.sqlite',
+  storage,
   logging: false,
   define: {
     freezeTableName: true

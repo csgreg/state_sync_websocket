@@ -12,9 +12,15 @@ const app = createServer((request, response) => {
     "public": "node_modules/@socket.io/admin-ui/ui/dist"
   });
 })
+// Set CORS_ORIGIN to your frontend origin(s) in production (comma-separated).
+// Defaults to "*" for easy local development.
+const corsOrigin = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+  : "*";
+
 const io = new Server(app, {
   cors: {
-    origin: "*",
+    origin: corsOrigin,
     methods: ["GET", "POST"],
     credentials: true,
   },
