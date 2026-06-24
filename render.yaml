@@ -1,13 +1,17 @@
-# Render Blueprint for the Rikiki websocket backend.
+# Render Blueprint for the Rikiki websocket backend (FREE tier).
 # Deploy: Render Dashboard > New > Blueprint > pick this repo.
 #
-# NOTE: the persistent disk requires a paid instance (Starter, ~$7/mo).
-# Free instances do NOT support disks and spin down on inactivity.
+# Free-tier tradeoffs:
+#  - No persistent disk: the SQLite file lives on the ephemeral container FS,
+#    so room state is lost on every restart / redeploy / cold start.
+#  - The service spins down after ~15 min of inactivity; the next request
+#    cold-starts in ~50s. An active game (open websocket) keeps it awake.
+# For state that survives restarts, switch to plan: starter + a disk (paid).
 services:
   - type: web
     name: rikiki-backend
     runtime: node
-    plan: starter
+    plan: free
     region: frankfurt
     buildCommand: npm install
     startCommand: npm start
@@ -15,13 +19,6 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # SQLite lives on the mounted disk so it survives restarts/redeploys.
-      - key: SQLITE_PATH
-        value: /var/data/wssync.sqlite
       # Lock CORS to the deployed frontend.
       - key: CORS_ORIGIN
         value: https://rikikicounter.vercel.app
-    disk:
-      name: data
-      mountPath: /var/data
-      sizeGB: 1
