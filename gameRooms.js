@@ -2,9 +2,93 @@ import { db } from "./sequelize.js";
 
 const MAX_ROOM_SIZE = 5;
 
+// Grace period before we migrate the host away from a disconnected player.
+// Long enough that a simple page refresh (disconnect -> reconnect) won't
+// trigger a host hand-off.
+const GRACE_MS = 12000;
+const migrationTimers = new Map();
+
+// The room state is stored double-encoded in the DB (sync-state does
+// JSON.stringify on the already-stringified client payload). Decode robustly.
+function decodeState(dbState) {
+  if (!dbState) return null;
+  try {
+    let v = JSON.parse(dbState);
+    if (typeof v === "string") v = JSON.parse(v);
+    return v;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function loadRoomObj(uuid) {
+  const room = await db.rooms.findOne({ where: { uuid } });
+  if (!room) return null;
+  return decodeState(room.state);
+}
+
+// Persist (keeping the double-encoding convention) and broadcast to the room.
+async function persistAndBroadcast(io, uuid, obj) {
+  const single = JSON.stringify(obj); // clients single-parse state-changed
+  await db.rooms.update(
+    { state: JSON.stringify(single) }, // DB stays double-encoded
+    { where: { uuid } }
+  );
+  io.to(uuid).emit("state-changed", { roomId: uuid, state: single });
+}
+
+// A socket dropped: mark its player offline, then after a grace period hand
+// over the host role if that player was the host and hasn't come back.
+async function handleSocketLeave(io, uuid, socketId) {
+  const obj = await loadRoomObj(uuid);
+  if (!obj || !Array.isArray(obj.players)) return;
+
+  const player = obj.players.find((p) => p.socketid === socketId);
+  if (!player) return;
+
+  player.online = false;
+  await persistAndBroadcast(io, uuid, obj);
+
+  const pid = player.pid;
+  const wasBoss = !!player.boss;
+  const key = `${uuid}:${pid}`;
+  if (migrationTimers.has(key)) clearTimeout(migrationTimers.get(key));
+  const timer = setTimeout(() => {
+    migrationTimers.delete(key);
+    migrateHostIfGone(io, uuid, pid, wasBoss);
+  }, GRACE_MS);
+  migrationTimers.set(key, timer);
+}
+
+async function migrateHostIfGone(io, uuid, pid, wasBoss) {
+  if (!wasBoss) return;
+  const obj = await loadRoomObj(uuid);
+  if (!obj || !Array.isArray(obj.players)) return;
+
+  const player = obj.players.find((p) => p.pid === pid);
+  if (!player || player.online) return; // gone for good but reconnected? skip
+  if (!player.boss) return; // host already handed over elsewhere
+
+  const heir = obj.players.find((p) => p.pid !== pid && p.online !== false);
+  if (!heir) return; // nobody to promote
+
+  player.boss = false;
+  heir.boss = true;
+  await persistAndBroadcast(io, uuid, obj);
+}
+
 export const gameRoom = (io) => {
   io.on("connection", (socket) => {
     console.log("Game room: connected", socket.id);
+
+    // Fires while the socket is still a member of its rooms (unlike
+    // "disconnect", where socket.rooms is already empty).
+    socket.on("disconnecting", () => {
+      const rooms = Array.from(socket.rooms).filter((r) => r !== socket.id);
+      rooms.forEach((uuid) => {
+        handleSocketLeave(io, uuid, socket.id);
+      });
+    });
 
     socket.on("create-room", async (size = MAX_ROOM_SIZE, ack) => {
       try {
