@@ -19,6 +19,6 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # Lock CORS to the deployed frontend.
+      # Lock CORS to the deployed frontends (custom domain + vercel.app).
       - key: CORS_ORIGIN
-        value: https://rikikicounter.vercel.app
+        value: https://www.therikiki.hu,https://therikiki.hu,https://rikikicounter.vercel.app
