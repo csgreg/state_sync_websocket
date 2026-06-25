@@ -1,6 +1,6 @@
 import { db } from "./sequelize.js";
 
-const MAX_ROOM_SIZE = 5;
+const MAX_ROOM_SIZE = 6;
 
 // Grace period before we migrate the host away from a disconnected player.
 // Long enough that a simple page refresh (disconnect -> reconnect) won't
