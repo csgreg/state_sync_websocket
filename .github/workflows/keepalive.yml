@@ -1,0 +1,23 @@
+name: keep-alive
+
+# Pings the Render service so the free instance doesn't spin down (which would
+# cold-start ~50s and wipe the in-memory + ephemeral SQLite room state).
+# Render free spins down after ~15 min idle, so we ping every 13 min.
+#
+# Scheduled to UTC 05:00–23:00 (~06:00–01:00 Hungarian time) to keep the free
+# instance-hours budget (~750h/month) comfortable while covering play hours.
+# Switch to "*/13 * * * *" for full 24/7 if you prefer.
+on:
+  schedule:
+    - cron: "*/13 5-23 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend
+        run: |
+          curl -fsS --retry 3 --max-time 90 \
+            https://rikiki-backend.onrender.com/ > /dev/null \
+            && echo "pinged ok"
